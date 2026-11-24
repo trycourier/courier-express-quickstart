@@ -14,7 +14,7 @@ Follow https://www.courier.com/docs/guides/add-notifications-to-express.md and t
 Use @trycourier/courier and read COURIER_API_KEY from the environment, on the server only.
 Send all three channels in one client.send.message with routing method "all", after the event's transaction commits, with one Idempotency-Key per event, and skip SMS when the user has no phone.
 Add GET /courier/token that mints the inbox JWT for the session user, never a user id from the request, and render <courier-inbox> on a page.
-When done, add a send script like the reference app's scripts/send.ts, run it, and show me the request id.
+When done, add a send command like the reference app's npm run send (scripts/send.ts), run it, and show me the request id.
 ```
 
 Install the Courier skill with `npx skills add trycourier/courier-skills` and connect the [Courier MCP server](https://www.courier.com/docs/resources/mcp), so the agent can read Courier Logs and templates itself. `AGENTS.md` lists the commands and the rules to keep.
@@ -54,15 +54,17 @@ The script assigns a demo task to `user_123` and prints Courier's request id. Th
 |---|---|
 | `lib/courier.ts` | The Courier client and `notifyTaskAssigned`: one `client.send.message` call with routing method `all` over email, SMS, and inbox, keyed by the assignment id |
 | `server.ts` | `POST /tasks/:taskId/assign` saves the assignment and sends. `GET /courier/token` mints a JWT scoped to the session user |
-| `public/index.html` | Renders `<courier-inbox>` from jsDelivr, with no bundler, and signs in with that JWT |
+| `public/index.html` | Renders `<courier-inbox>` from jsDelivr, pinned to 2.7.4 with no bundler, and signs in with that JWT |
 | `scripts/send.ts` | Calls `POST /tasks/task_1/assign` on the running server and prints the request id |
 | `scripts/first-send.ts` | Sends one plain email straight from the SDK |
 
 ## Adapting it to your app
 
-**Read the user from your session.** `server.ts` pins `user_123` so the inbox page and the send script agree. Replace `sessionUser` with whatever your auth middleware sets, and keep the token route reading from it. A token route that takes a user id from the request lets any caller read any user's inbox.
+**Read the user from your session.** While `DEMO_EMAIL` is set, `server.ts` treats every request as `user_123`, so the inbox page and the send script agree. Have your auth middleware set `res.locals.user`, leave `DEMO_EMAIL` unset in production, and keep the token route reading from the session. A token route that takes a user id from the request lets any caller read any user's inbox. The assign route needs your app's auth too.
 
-**Send after you commit.** Call `notifyTaskAssigned` once the assignment row is saved, so a rolled-back write notifies nobody. The assignment id is the idempotency key, so retrying the call from a job queue is safe.
+**Send after you commit.** Call `notifyTaskAssigned` once the assignment row is saved, so a rolled-back write notifies nobody. The assignment id is the idempotency key. Retry a timeout, connection error, or 429 with the same key, and it sends at most once. Courier replays any other error for that key for 25 hours, so fix the cause and send with a new key.
+
+**Refresh the inbox token.** It lasts a day, and the inbox doesn't refresh it. Mint a new one and sign in again before it expires, as [Authenticate users](https://www.courier.com/docs/in-app/authenticate-users#5-refresh-tokens) shows.
 
 **Keep your providers.** Connect SendGrid, Postmark, Amazon SES, your SMTP server, or Twilio in Courier. The code doesn't change when you switch or add a backup provider.
 
@@ -74,13 +76,15 @@ The script assigns a demo task to `user_123` and prints Courier's request id. Th
 | `npm run dev` | Start the server on port 3000, reloading on change |
 | `npm run start` | Start the server without watching |
 | `npm run send` | Assign a demo task through the running server and print the request id |
-| `npm run build` | Type-check with `tsc` |
+| `npm run typecheck` | Type-check with `tsc` |
 
 ## Troubleshooting
 
 **The inbox stays empty.** The send's `to.user_id` and the token's `user_id` must match. Both are `user_123` in this app.
 
 **SMS is `UNROUTABLE` with `DEMO_PHONE` set.** Connect an SMS provider in the key's environment, and write the number in E.164 form, such as `+12025550156`.
+
+**`node: .env: not found`.** Run `cp .env.example .env` and fill it in.
 
 **`npm run send` prints `Courier didn't accept the notification`.** The server log has Courier's error. A `401` means the key is wrong. Copy it again from [Platform → API Keys](https://app.courier.com/settings/api-keys) and restart `npm run dev`.
 

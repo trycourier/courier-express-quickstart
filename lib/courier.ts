@@ -39,8 +39,9 @@ export async function notifyTaskAssigned(assignee: User, task: Task, assignmentI
       // "all" sends on every listed channel at once. Courier picks the provider inside each one.
       routing: { method: "all", channels },
     },
-    // One key per assignment. The SDK retries timeouts and server errors with
-    // the same key, and Courier returns the first response instead of resending.
+    // One key per assignment. After a timeout, connection error, or 429, a retry
+    // with this key sends at most once. Courier stores any other error under the
+    // key for 25 hours and replays it, so fix the cause and send with a new key.
     "Idempotency-Key": `task-assigned-${assignmentId}`,
   });
 

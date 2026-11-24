@@ -10,13 +10,13 @@ Guide: https://www.courier.com/docs/guides/add-notifications-to-express
 - `npm run first-send`: send one plain email to `DEMO_EMAIL`, to check the key
 - `npm run dev`: start the server on port 3000, reloading on change, and serve the inbox page
 - `npm run send`: assign a demo task to `user_123` through the running server and print the request id
-- `npm run build`: type-check with `tsc`
+- `npm run typecheck`: type-check with `tsc`
 
 ## Environment (`.env`, loaded by `tsx --env-file`)
 
 - `COURIER_API_KEY`: read in `lib/courier.ts` and `scripts/first-send.ts`
 - `APP_URL`: the public URL that links are built from, read in `server.ts`
-- `DEMO_EMAIL`, `DEMO_PHONE`: the demo user's contact details, read in `server.ts` and the scripts. Without `DEMO_PHONE`, the send skips SMS.
+- `DEMO_EMAIL`, `DEMO_PHONE`: the demo user's contact details, read in `server.ts` and the scripts. While `DEMO_EMAIL` is set, every request acts as `user_123`. Without `DEMO_PHONE`, the send skips SMS.
 
 ## Files
 
@@ -28,8 +28,8 @@ Guide: https://www.courier.com/docs/guides/add-notifications-to-express
 ## Rules
 
 - Keep `COURIER_API_KEY` on the server. The browser gets only a scoped JWT.
-- Read the user for the token from the session. Keep the "Read the user from your session here" comment, and never take a user id from the request.
-- Pass one `Idempotency-Key` per assignment: `task-assigned-<assignment id>`.
+- Read the user for the token from the session (`res.locals.user`), and answer 401 without one. Keep the "Read the user from your session here" comment, and never take a user id from the request.
+- Pass one `Idempotency-Key` per assignment: `task-assigned-<assignment id>`. Reuse it only after a timeout, connection error, or 429. Courier replays any other error for that key for 25 hours.
 - Send after the assignment's transaction commits.
 - Build links from `APP_URL`, never from the request's `Host` header.
 - Use the `@trycourier/courier` SDK, and don't call the email or SMS provider directly.

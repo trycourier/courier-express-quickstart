@@ -12,7 +12,7 @@
     "dev": "tsx watch --env-file=.env server.ts",
     "start": "tsx --env-file=.env server.ts",
     "send": "tsx --env-file=.env scripts/send.ts",
-    "build": "tsc"
+    "typecheck": "tsc"
   },
   "dependencies": {
     "@trycourier/courier": "^10.2.0",
