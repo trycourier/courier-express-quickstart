@@ -29,7 +29,7 @@ Guide: https://www.courier.com/docs/guides/add-notifications-to-express
 
 - Keep `COURIER_API_KEY` on the server. The browser gets only a scoped JWT.
 - Read the user for the token from the session (`res.locals.user`), and answer 401 without one. Keep the "Read the user from your session here" comment, and never take a user id from the request.
-- Pass one `Idempotency-Key` per assignment: `task-assigned-<assignment id>`. Reuse it only after a timeout, connection error, or 429. Courier replays any other error for that key for 25 hours.
+- Pass one `Idempotency-Key` per assignment: `task-assigned-<assignment id>`. Reuse it only after a timeout, connection error, 429, or 409, and wait 60 seconds first. Courier replays any other error for that key for 25 hours.
 - Send after the assignment's transaction commits.
 - Build links from `APP_URL`, never from the request's `Host` header.
 - Use the `@trycourier/courier` SDK, and don't call the email or SMS provider directly.

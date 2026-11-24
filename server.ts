@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import express, { type NextFunction, type Request, type Response } from "express";
-import { APIConnectionError, RateLimitError } from "@trycourier/courier";
+import { APIConnectionError, ConflictError, RateLimitError } from "@trycourier/courier";
 import { courier, notifyTaskAssigned, type User } from "./lib/courier.ts";
 
 // Build links from your configured URL, never from the request's Host header.
@@ -79,9 +79,11 @@ app.post("/tasks/:taskId/assign", async (req, res) => {
   } catch (error) {
     // The assignment is saved, so answer 201 rather than prompt a retry that
     // would create a second one. This demo only logs the failure. In your app,
-    // retry a timeout, connection error, or 429 with the same key. Courier
-    // replays any other error for that key, so fix the cause and use a new key.
-    const retryable = error instanceof APIConnectionError || error instanceof RateLimitError;
+    // retry a timeout, connection error, 429, or 409 with the same key, after 60
+    // seconds. Courier replays any other error for that key, so fix the cause and
+    // use a new key.
+    const retryable =
+      error instanceof APIConnectionError || error instanceof RateLimitError || error instanceof ConflictError;
     console.error(`Notification failed for assignment ${assignment.id} (retryable: ${retryable}):`, error);
     res.status(201).json({ assignment, requestId: null, error: "Courier didn't accept the notification. Check the server log." });
   }

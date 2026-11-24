@@ -62,7 +62,7 @@ The script assigns a demo task to `user_123` and prints Courier's request id. Th
 
 **Read the user from your session.** While `DEMO_EMAIL` is set, `server.ts` treats every request as `user_123`, so the inbox page and the send script agree. Have your auth middleware set `res.locals.user`, leave `DEMO_EMAIL` unset in production, and keep the token route reading from the session. A token route that takes a user id from the request lets any caller read any user's inbox. The assign route needs your app's auth too.
 
-**Send after you commit.** Call `notifyTaskAssigned` once the assignment row is saved, so a rolled-back write notifies nobody. The assignment id is the idempotency key. Retry a timeout, connection error, or 429 with the same key, and it sends at most once. Courier replays any other error for that key for 25 hours, so fix the cause and send with a new key.
+**Send after you commit.** Call `notifyTaskAssigned` once the assignment row is saved, so a rolled-back write notifies nobody. The assignment id is the idempotency key. Retry a timeout, connection error, 429, or 409 with the same key after 60 seconds, and it sends at most once. Courier replays any other error for that key for 25 hours, so fix the cause and send with a new key.
 
 **Refresh the inbox token.** It lasts a day, and the inbox doesn't refresh it. Mint a new one and sign in again before it expires, as [Authenticate users](https://www.courier.com/docs/in-app/authenticate-users#5-refresh-tokens) shows.
 
