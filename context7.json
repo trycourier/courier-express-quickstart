@@ -1,0 +1,14 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "url": "https://context7.com/trycourier/courier-express-quickstart",
+  "public_key": "pk_U3bU2CvznIef5RMDpii82",
+  "projectTitle": "Courier notifications: Express quickstart",
+  "description": "An Express 5 app in TypeScript that sends email, SMS, and in-app notifications in one Courier send, and renders them in a <courier-inbox>.",
+  "rules": [
+    "Use the @trycourier/courier SDK and read COURIER_API_KEY from the environment, on the server only.",
+    "Send email, SMS, and inbox in one client.send.message with routing method \"all\". Leave sms out of the channels when the user has no phone number.",
+    "Pass one Idempotency-Key per event, built from the saved event's id, such as task-assigned-<assignment id>.",
+    "Mint the inbox JWT with client.auth.issueToken for the user in the session, never a user id from the request.",
+    "Connect email and SMS providers in Courier instead of calling them directly."
+  ]
+}
