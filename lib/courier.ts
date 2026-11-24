@@ -3,7 +3,7 @@ import Courier from "@trycourier/courier";
 // Fail at startup, not mid-request, when the key is missing.
 const apiKey = process.env.COURIER_API_KEY;
 if (!apiKey) {
-  throw new Error("COURIER_API_KEY is not set. Copy .env.example to .env and add your key.");
+  throw new Error("COURIER_API_KEY is not set. Add it to .env.");
 }
 
 export const courier = new Courier({ apiKey });
