@@ -1,6 +1,6 @@
 import Courier from "@trycourier/courier";
 
-// Check the key once, at startup, so a missing key fails before any request.
+// Fail at startup, not mid-request, when the key is missing.
 const apiKey = process.env.COURIER_API_KEY;
 if (!apiKey) {
   throw new Error("COURIER_API_KEY is not set. Copy .env.example to .env and add your key.");
@@ -20,35 +20,27 @@ export type Task = {
   url: string;
 };
 
-/**
- * Tells a teammate a task is theirs by email, SMS, and in-app inbox, in one send.
- * Call it once per assignment, after the assignment is saved.
- */
+// Call once per assignment, after it's saved.
 export async function notifyTaskAssigned(assignee: User, task: Task, assignmentId: string) {
-  // Text only teammates who gave you a phone number. Everyone gets email and inbox.
+  // Text only teammates with a phone number.
   const channels = assignee.phone_number ? ["email", "sms", "inbox"] : ["email", "inbox"];
 
   const { requestId } = await courier.send.message(
     {
       message: {
-        // user_id is the inbox the message lands in. It must match the token's user.
+        // user_id picks the inbox, so it must match the token's user.
         to: { user_id: assignee.id, email: assignee.email, phone_number: assignee.phone_number },
         content: {
           title: `New task: ${task.title}`,
           body: `You're assigned to it. Open it here: ${task.url}`,
         },
-        // "all" sends on every listed channel at once. Courier picks the provider inside each one.
+        // "all" sends on every listed channel, not just the first that works.
         routing: { method: "all", channels },
       },
-      // One key per assignment. After a timeout, connection error, or 429, a retry
-      // with this key sends at most once. Wait 60 seconds first: until then Courier
-      // answers 409 for the key. Courier stores any other error under the key for
-      // 25 hours and replays it, so fix the cause and send with a new key.
+      // One key per assignment, so a retry sends at most once.
       "Idempotency-Key": `task-assigned-${assignmentId}`,
     },
-    // No SDK retries inside the request. On a 429 or 409 the SDK would sleep out
-    // Courier's Retry-After, up to a minute, while the caller waits. Retry from a
-    // queue instead.
+    // Fail fast: SDK retries would wait out Retry-After inside the request.
     { maxRetries: 0 },
   );
 

@@ -4,23 +4,19 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { APIConnectionError, ConflictError, RateLimitError } from "@trycourier/courier";
 import { courier, notifyTaskAssigned, type User } from "./lib/courier.ts";
 
-// Build links from your configured URL, never from the request's Host header.
-// Checked at startup, so a missing value fails before any request.
+// Build links from APP_URL, never the request's Host header.
 const appUrl = process.env.APP_URL;
 if (!appUrl) throw new Error("APP_URL is not set. Links in notifications need your app's public URL.");
 
 const demoEmail = process.env.DEMO_EMAIL;
 if (demoEmail === "YOUR_EMAIL") throw new Error("Set DEMO_EMAIL in .env to your own email address.");
 
-// DEMO ONLY. This app has no login, so while DEMO_EMAIL is set, every request
-// acts as user_123. A real app gets the user from its session or database, and
-// leaves DEMO_EMAIL unset in production.
+// DEMO ONLY. While DEMO_EMAIL is set, every request acts as user_123.
 const demoUser: User | undefined = demoEmail
   ? { id: "user_123", email: demoEmail, phone_number: process.env.DEMO_PHONE || undefined }
   : undefined;
 
-// The signed-in user, or undefined. res.locals.user is where your auth
-// middleware puts it. The demo user fills in only when DEMO_EMAIL is set.
+// Your auth middleware puts the signed-in user in res.locals.user.
 function sessionUser(res: Response): User | undefined {
   return res.locals.user ?? demoUser;
 }
@@ -42,8 +38,7 @@ app.get("/courier/token", async (_req, res) => {
     return;
   }
 
-  // The token lasts a day. The inbox doesn't refresh it, so a real app mints a
-  // new one and signs in again before it expires.
+  // The inbox doesn't refresh the token, so mint a new one before the day is up.
   const { token } = await courier.auth.issueToken({
     scope: `user_id:${user.id} inbox:read:messages inbox:write:events`,
     expires_in: "1 day",
@@ -53,8 +48,7 @@ app.get("/courier/token", async (_req, res) => {
 });
 
 app.post("/tasks/:taskId/assign", async (req, res) => {
-  // This route needs your app's auth: only a signed-in member of the task's
-  // workspace may assign it. The demo checks only that someone is signed in.
+  // Allow only the task's workspace members. The demo checks sign-in only.
   if (!sessionUser(res)) {
     res.status(401).json({ error: "Sign in first." });
     return;
@@ -66,9 +60,7 @@ app.post("/tasks/:taskId/assign", async (req, res) => {
     return;
   }
 
-  // Load the task and save the assignment in your database here. Send after the
-  // transaction commits, so a rolled-back assignment notifies nobody. The saved
-  // assignment's id keys the send, and a later reassignment gets a new id.
+  // Save the assignment here. Send after it commits, so a rollback notifies nobody.
   const task = { id: req.params.taskId, title: "Review the launch checklist" };
   const assignment = { id: randomUUID(), taskId: task.id, assigneeId: assignee.id };
   const url = `${appUrl}/tasks/${encodeURIComponent(task.id)}`;
@@ -77,11 +69,7 @@ app.post("/tasks/:taskId/assign", async (req, res) => {
     const requestId = await notifyTaskAssigned(assignee, { ...task, url }, assignment.id);
     res.status(201).json({ assignment, requestId });
   } catch (error) {
-    // The assignment is saved, so answer 201 rather than prompt a retry that
-    // would create a second one. This demo only logs the failure. In your app,
-    // retry a timeout, connection error, 429, or 409 with the same key, after 60
-    // seconds. Courier replays any other error for that key, so fix the cause and
-    // use a new key.
+    // The assignment is saved, so answer 201 and leave retries to your queue.
     const retryable =
       error instanceof APIConnectionError || error instanceof RateLimitError || error instanceof ConflictError;
     console.error(`Notification failed for assignment ${assignment.id} (retryable: ${retryable}):`, error);
@@ -89,7 +77,7 @@ app.post("/tasks/:taskId/assign", async (req, res) => {
   }
 });
 
-// Answer errors as JSON, instead of Express's HTML stack trace page.
+// Answer errors as JSON, not Express's HTML stack trace page.
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (error instanceof SyntaxError) {
     res.status(400).json({ error: "The request body isn't valid JSON." });
